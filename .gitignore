@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+
+# AI tool working directory
+.claude/
+
+# Working notes (not deliverables)
+word_ready_content.md
+analysis_section_text.md
+
+# Group report PDF (submitted separately)
+*.pdf
