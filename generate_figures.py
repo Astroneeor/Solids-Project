@@ -54,8 +54,19 @@ NAIL_C_EDGE = "#3D8B3D"
 # FIGURE 1 — Vertical sagittal schematic: straight vs curved nail
 # ================================================================
 def fig1_schematic():
-    fig, axes = plt.subplots(1, 2, figsize=(8, 9),
-                             gridspec_kw={"wspace": 0.45})
+    """
+    Anatomical notes (from literature):
+    - IM nail enters through the greater trochanter (proximal) and sits
+      entirely INSIDE the medullary canal.
+    - The nail diameter (~9–13 mm) is smaller than the canal (~13–16 mm),
+      so there is clearance.
+    - A straight nail in a bowed femur drifts toward the ANTERIOR
+      endosteal wall at mid/distal shaft, potentially contacting it.
+    - A curved (bow-matched) nail follows the canal centreline and stays
+      centred with uniform clearance all around.
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(9, 9.5),
+                             gridspec_kw={"wspace": 0.40})
 
     for ax_idx, (ax, title, nail_type) in enumerate(zip(
             axes,
@@ -65,125 +76,170 @@ def fig1_schematic():
         ax.set_aspect("equal")
         ax.axis("off")
 
-        # ── Bowed femur using a parabolic canal centreline ──
+        # ── Bowed femur (parabolic canal centreline) ──
         # Proximal = top (t=0), distal = bottom (t=1)
-        # Canal bows to the RIGHT (anterior) at mid-shaft
-        n_pts = 300
+        # Anterior = RIGHT in sagittal view
+        n_pts = 400
         t = np.linspace(0, 1, n_pts)
-        bone_height = 18.0
-        bow_amplitude = 2.2  # max lateral bow at midspan (exaggerated)
+        bone_height = 20.0
+        bow_amp = 2.5  # exaggerated peak bow at midspan
 
-        # Canal centreline: vertical + parabolic bow
-        xm = bow_amplitude * 4 * t * (1 - t)   # peaks at t=0.5
-        ym = bone_height * (1 - t)               # top to bottom
+        # Canal centreline
+        xm = bow_amp * 4 * t * (1 - t)  # parabolic bow peaking at t=0.5
+        ym = bone_height * (1 - t)       # top → bottom
 
-        # Perpendicular normals (to the right = anterior)
+        # Unit normals perpendicular to canal (anterior = +x direction)
         dx = np.gradient(xm)
         dy = np.gradient(ym)
         mag = np.sqrt(dx**2 + dy**2)
-        # Normal pointing to the right (anterior)
-        nx_u = -dy / mag
-        ny_u = dx / mag
+        nx_u = -dy / mag   # normal x (points anterior/right)
+        ny_u =  dx / mag   # normal y
 
-        bone_hw = 2.2    # bone half-width
-        canal_hw = 1.3   # canal half-width
+        bone_hw  = 2.5   # cortex outer half-width
+        canal_hw = 1.5   # endosteal (canal) half-width
+        nail_hw  = 0.65  # nail half-width — SMALLER than canal
 
-        # Cortex walls
-        xa = xm + bone_hw * nx_u;  ya = ym + bone_hw * ny_u
-        xp = xm - bone_hw * nx_u;  yp = ym - bone_hw * ny_u
-        # Canal walls
-        xca = xm + canal_hw * nx_u; yca = ym + canal_hw * ny_u
-        xcp = xm - canal_hw * nx_u; ycp = ym - canal_hw * ny_u
+        # ── Build cortex & canal boundaries ──
+        xa  = xm + bone_hw  * nx_u;  ya  = ym + bone_hw  * ny_u  # anterior cortex
+        xp  = xm - bone_hw  * nx_u;  yp  = ym - bone_hw  * ny_u  # posterior cortex
+        xca = xm + canal_hw * nx_u;  yca = ym + canal_hw * ny_u  # anterior canal wall
+        xcp = xm - canal_hw * nx_u;  ycp = ym - canal_hw * ny_u  # posterior canal wall
 
-        # Draw cortical bone (filled polygon)
-        verts_outer = list(zip(xa, ya)) + list(zip(xp[::-1], yp[::-1]))
-        ax.add_patch(plt.Polygon(verts_outer, closed=True,
+        # Draw cortical bone
+        verts_bone = list(zip(xa, ya)) + list(zip(xp[::-1], yp[::-1]))
+        ax.add_patch(plt.Polygon(verts_bone, closed=True,
                                  facecolor=BONE_FILL, edgecolor=BONE_EDGE,
                                  linewidth=1.8, zorder=1))
-
-        # Canal interior (white)
+        # Draw canal interior
         verts_canal = list(zip(xca, yca)) + list(zip(xcp[::-1], ycp[::-1]))
         ax.add_patch(plt.Polygon(verts_canal, closed=True,
-                                 facecolor="white", edgecolor=CANAL_EDGE,
-                                 linewidth=0.8, linestyle="--", zorder=2))
+                                 facecolor="#FAFAF5", edgecolor=CANAL_EDGE,
+                                 linewidth=0.9, linestyle="--", zorder=2))
 
-        # ── Nail ──
-        nail_hw = 0.85
+        # ── Nail centreline ──
         if nail_type == "straight":
-            # Straight line from proximal entry to distal entry
+            # Straight chord between proximal and distal canal entry points.
+            # The nail enters at the canal centre proximally and exits at
+            # the canal centre distally — so it's a straight line between
+            # (xm[0], ym[0]) and (xm[-1], ym[-1]).
             xn_c = np.linspace(xm[0], xm[-1], n_pts)
             yn_c = np.linspace(ym[0], ym[-1], n_pts)
             nfill, nedge = NAIL_S_FILL, NAIL_S_EDGE
         else:
-            xn_c, yn_c = xm.copy(), ym.copy()
+            # Curved nail follows the canal centreline exactly
+            xn_c = xm.copy()
+            yn_c = ym.copy()
             nfill, nedge = NAIL_C_FILL, NAIL_C_EDGE
 
-        # Nail perpendicular offsets
+        # Nail edges (perpendicular to nail path)
         dnx = np.gradient(xn_c); dny = np.gradient(yn_c)
         nmag = np.sqrt(dnx**2 + dny**2)
         nnx = -dny / nmag; nny = dnx / nmag
 
-        xna = xn_c + nail_hw * nnx; yna = yn_c + nail_hw * nny
-        xnp = xn_c - nail_hw * nnx; ynp = yn_c - nail_hw * nny
+        xna = xn_c + nail_hw * nnx;  yna = yn_c + nail_hw * nny  # anterior edge
+        xnp = xn_c - nail_hw * nnx;  ynp = yn_c - nail_hw * nny  # posterior edge
 
+        # CLAMP: ensure nail never exceeds canal walls.
+        # Project nail edges onto canal-normal axis and clamp.
+        for i in range(n_pts):
+            # Distance from canal centre to nail anterior edge, in canal-normal coords
+            nail_ant_proj = (xna[i] - xm[i]) * nx_u[i] + (yna[i] - ym[i]) * ny_u[i]
+            if nail_ant_proj > canal_hw - 0.08:
+                # Push nail anterior edge to just inside canal wall
+                overshoot = nail_ant_proj - (canal_hw - 0.08)
+                xna[i] -= overshoot * nx_u[i]
+                yna[i] -= overshoot * ny_u[i]
+                xnp[i] -= overshoot * nx_u[i]
+                ynp[i] -= overshoot * ny_u[i]
+                # Also shift centreline for annotation
+                xn_c[i] -= overshoot * nx_u[i]
+                yn_c[i] -= overshoot * ny_u[i]
+
+            nail_post_proj = (xnp[i] - xm[i]) * nx_u[i] + (ynp[i] - ym[i]) * ny_u[i]
+            if nail_post_proj < -(canal_hw - 0.08):
+                overshoot = -(canal_hw - 0.08) - nail_post_proj
+                xnp[i] += overshoot * nx_u[i]
+                ynp[i] += overshoot * ny_u[i]
+                xna[i] += overshoot * nx_u[i]
+                yna[i] += overshoot * ny_u[i]
+                xn_c[i] += overshoot * nx_u[i]
+                yn_c[i] += overshoot * ny_u[i]
+
+        # Draw nail
         verts_nail = list(zip(xna, yna)) + list(zip(xnp[::-1], ynp[::-1]))
         ax.add_patch(plt.Polygon(verts_nail, closed=True,
                                  facecolor=nfill, edgecolor=nedge,
-                                 linewidth=1.2, alpha=0.88, zorder=3))
+                                 linewidth=1.2, alpha=0.90, zorder=3))
+
+        # ── Visible gap between nail and posterior canal wall (straight nail) ──
+        # This highlights that the nail has shifted anteriorly
+        if nail_type == "straight":
+            # Draw a thin light-blue gap indicator on the posterior side
+            for frac in [0.40, 0.50, 0.60, 0.70]:
+                i = int(frac * n_pts)
+                # Small arrow from nail posterior edge → canal posterior wall
+                ax.annotate("",
+                            xy=(xcp[i] + 0.15 * nx_u[i], ycp[i] + 0.15 * ny_u[i]),
+                            xytext=(xnp[i] - 0.10 * nx_u[i], ynp[i] - 0.10 * ny_u[i]),
+                            arrowprops=dict(arrowstyle="<->", color="#6699BB",
+                                            lw=0.7, shrinkA=0, shrinkB=0),
+                            zorder=4)
+            # "gap" label
+            ig = int(0.40 * n_pts)
+            ax.text(xcp[ig] - 0.9, ycp[ig], "Gap",
+                    fontsize=8, color="#4477AA", ha="right", va="center",
+                    fontstyle="italic")
 
         # ── Force arrow at proximal end ──
         ax.annotate("",
-                    xy=(xm[0], ym[0] + 0.2),
-                    xytext=(xm[0], ym[0] + 3.5),
+                    xy=(xm[0], ym[0] + 0.3),
+                    xytext=(xm[0], ym[0] + 3.8),
                     arrowprops=dict(arrowstyle="->,head_width=0.35,"
                                    "head_length=0.25",
                                    color="black", lw=2.2), zorder=5)
-        ax.text(xm[0] + 0.5, ym[0] + 3.0, r"$N$", fontsize=15,
+        ax.text(xm[0] + 0.5, ym[0] + 3.3, r"$N$", fontsize=15,
                 fontweight="bold", ha="left", va="center")
 
-        # ── Side labels (rotated along the bone axis) ──
-        mid = n_pts // 2
-        # Place "Anterior" at 25% from top (above impingement zone)
-        q1 = int(0.20 * n_pts)
-        ax.text(xa[q1] + 1.3, ya[q1], "Anterior", fontsize=10,
-                ha="left", va="center", color="#555", fontstyle="italic",
-                rotation=-5)
-        ax.text(xp[q1] - 1.3, yp[q1], "Posterior", fontsize=10,
-                ha="right", va="center", color="#555", fontstyle="italic",
-                rotation=-5)
+        # ── Side labels ──
+        q1 = int(0.18 * n_pts)
+        ax.text(xa[q1] + 1.5, ya[q1], "Anterior", fontsize=10,
+                ha="left", va="center", color="#555", fontstyle="italic")
+        ax.text(xp[q1] - 1.5, yp[q1], "Posterior", fontsize=10,
+                ha="right", va="center", color="#555", fontstyle="italic")
 
         # ── Proximal / Distal ──
-        ax.text(xm[0] - 3.0, ym[0] + 0.3, "Proximal", fontsize=9,
+        ax.text(xm[0] - 3.5, ym[0] + 0.3, "Proximal", fontsize=9,
                 ha="center", color="#777")
-        ax.text(xm[-1] - 3.0, ym[-1] - 0.3, "Distal", fontsize=9,
+        ax.text(xm[-1] - 3.5, ym[-1] - 0.3, "Distal", fontsize=9,
                 ha="center", color="#777")
 
-        # ── Annotations for each nail type ──
+        # ── Nail-type-specific annotations ──
         if nail_type == "straight":
-            # y_n double-arrow at ~65% along bone
-            idx = int(0.65 * n_pts)
+            # y_n double-arrow: nail centreline ↔ canal centreline
+            idx = int(0.55 * n_pts)
             ax.annotate("",
                         xy=(xn_c[idx], yn_c[idx]),
                         xytext=(xm[idx], ym[idx]),
                         arrowprops=dict(arrowstyle="<->", color="#333",
                                         lw=1.3, shrinkA=1, shrinkB=1),
                         zorder=6)
-            lx = max(xn_c[idx], xm[idx]) + 0.6
+            lx = max(xn_c[idx], xm[idx]) + 0.7
             ly = (yn_c[idx] + ym[idx]) / 2
             ax.text(lx, ly, r"$y_n$", fontsize=13, fontweight="bold",
                     ha="left", va="center", color="#333")
 
-            # Impingement X markers along anterior cortex
-            for frac in [0.45, 0.55, 0.65, 0.75, 0.85]:
+            # Contact markers on the ANTERIOR CANAL WALL (endosteal surface)
+            # — this is where the nail presses, NOT on the outer cortex
+            for frac in [0.40, 0.50, 0.58, 0.66, 0.74, 0.82]:
                 i2 = int(frac * n_pts)
-                ax.plot(xa[i2], ya[i2], "x", color=C_ALLOW,
-                        markersize=7, markeredgewidth=2.0, zorder=6)
+                ax.plot(xca[i2], yca[i2], "x", color=C_ALLOW,
+                        markersize=6, markeredgewidth=1.8, zorder=6)
 
-            # Impingement label
-            i_imp = int(0.55 * n_pts)
-            ax.annotate("Impingement\nrisk zone",
-                        xy=(xa[i_imp] + 0.1, ya[i_imp]),
-                        xytext=(xa[i_imp] + 3.0, ya[i_imp] + 1.5),
+            # Impingement label pointing to anterior canal wall
+            i_imp = int(0.48 * n_pts)
+            ax.annotate("Endosteal\ncontact zone",
+                        xy=(xca[i_imp], yca[i_imp]),
+                        xytext=(xca[i_imp] + 3.5, yca[i_imp] + 1.8),
                         fontsize=9, color=C_ALLOW, fontweight="bold",
                         ha="left", va="center",
                         arrowprops=dict(arrowstyle="->", color=C_ALLOW,
@@ -191,19 +247,35 @@ def fig1_schematic():
                                         connectionstyle="arc3,rad=-0.15"),
                         zorder=6)
         else:
-            # y_n = 0 label
-            ax.text(xm[mid] + 2.0, ym[mid], r"$y_n = 0$",
+            # y_n = 0 label with box
+            mid = n_pts // 2
+            ax.text(xm[mid] + 2.5, ym[mid], r"$y_n = 0$",
                     fontsize=12, ha="left", va="center",
                     color=NAIL_C_EDGE, fontweight="bold",
                     bbox=dict(facecolor="white", edgecolor=NAIL_C_EDGE,
                               boxstyle="round,pad=0.3", alpha=0.85))
 
-        # Auto-set axis limits with padding
+            # Show uniform clearance arrows
+            for frac in [0.35, 0.55, 0.75]:
+                i = int(frac * n_pts)
+                # Anterior gap
+                ax.annotate("",
+                            xy=(xca[i] - 0.1 * nx_u[i], yca[i] - 0.1 * ny_u[i]),
+                            xytext=(xna[i] + 0.1 * nx_u[i], yna[i] + 0.1 * ny_u[i]),
+                            arrowprops=dict(arrowstyle="<->", color="#6699BB",
+                                            lw=0.7), zorder=4)
+                # Posterior gap
+                ax.annotate("",
+                            xy=(xcp[i] + 0.1 * nx_u[i], ycp[i] + 0.1 * ny_u[i]),
+                            xytext=(xnp[i] - 0.1 * nx_u[i], ynp[i] - 0.1 * ny_u[i]),
+                            arrowprops=dict(arrowstyle="<->", color="#6699BB",
+                                            lw=0.7), zorder=4)
+
+        # Auto-set axis limits
         all_x = np.concatenate([xa, xp])
         all_y = np.concatenate([ya, yp])
-        pad_x, pad_y = 6.5, 4.5
-        ax.set_xlim(all_x.min() - pad_x, all_x.max() + pad_x + 1.5)
-        ax.set_ylim(all_y.min() - pad_y, all_y.max() + pad_y)
+        ax.set_xlim(all_x.min() - 7, all_x.max() + 8)
+        ax.set_ylim(all_y.min() - 4.5, all_y.max() + 5)
 
         ax.set_title(title, fontsize=13, fontweight="bold", pad=10)
 
@@ -211,13 +283,15 @@ def fig1_schematic():
     legend_elements = [
         mpatches.Patch(facecolor=BONE_FILL, edgecolor=BONE_EDGE,
                        lw=1.5, label="Cortical bone"),
+        mpatches.Patch(facecolor="#FAFAF5", edgecolor=CANAL_EDGE,
+                       lw=0.9, linestyle="--", label="Medullary canal"),
         mpatches.Patch(facecolor=NAIL_S_FILL, edgecolor=NAIL_S_EDGE,
                        lw=1.2, label="Straight nail"),
         mpatches.Patch(facecolor=NAIL_C_FILL, edgecolor=NAIL_C_EDGE,
                        lw=1.2, label="Curved nail"),
     ]
-    fig.legend(handles=legend_elements, loc="lower center", ncol=3,
-              frameon=True, fontsize=10, bbox_to_anchor=(0.5, 0.01),
+    fig.legend(handles=legend_elements, loc="lower center", ncol=4,
+              frameon=True, fontsize=9.5, bbox_to_anchor=(0.5, 0.01),
               edgecolor="#ccc")
 
     fig.suptitle(
